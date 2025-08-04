@@ -2,10 +2,14 @@
 	"name": "mrdarrengriffin/cheese-board",
 	"image": "mcr.microsoft.com/devcontainers/base:bullseye",
 	"forwardPorts": [
-		8080
+		3000
+	],
+	"remoteUser": "vscode",
+	"runArgs": [
+		"--network=host"
 	],
 	"portsAttributes": {
-		"8080": {
+		"3000": {
 			"label": "Preview"
 		}
 	},

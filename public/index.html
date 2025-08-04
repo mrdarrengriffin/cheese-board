@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Discord Soundboard</title>
+    <style>
+      :root {
+        --accent: #5865f2;
+        --accent-hover: #4752c4;
+        --danger: #e74c3c;
+        --danger-hover: #c0392b;
+        --bg: #f4f4f7;
+        --card-bg: #ffffff;
+        --text: #222;
+        --border-radius: 8px;
+        --shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        margin: 0;
+        padding: 2em;
+        background: var(--bg);
+        color: var(--text);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+
+      h1,
+      h2 {
+        margin-bottom: 0.5em;
+        text-align: center;
+      }
+
+      #sounds {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        justify-content: center;
+        margin: 1em 0 2em;
+      }
+
+      button.sound-btn {
+        background: var(--accent);
+        color: white;
+        font-size: 1rem;
+        padding: 12px 20px;
+        border: none;
+        border-radius: var(--border-radius);
+        cursor: pointer;
+        box-shadow: var(--shadow);
+        transition: background 0.2s, transform 0.1s;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-width: 120px;
+        justify-content: center;
+      }
+
+      button.sound-btn:hover {
+        background: var(--accent-hover);
+        transform: translateY(-1px);
+      }
+
+      form {
+        background: var(--card-bg);
+        padding: 1.5em;
+        border-radius: var(--border-radius);
+        box-shadow: var(--shadow);
+        width: 100%;
+        max-width: 400px;
+        margin-bottom: 2em;
+      }
+
+      form label {
+        display: block;
+        margin-bottom: 0.75em;
+        font-weight: 600;
+      }
+
+      input[type="text"],
+      input[type="file"],
+      button[type="submit"] {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #ccc;
+        border-radius: var(--border-radius);
+        font-size: 1rem;
+        margin-top: 0.25em;
+      }
+
+      input[type="file"] {
+        background: white;
+      }
+
+      button[type="submit"] {
+        background: var(--accent);
+        color: white;
+        border: none;
+        margin-top: 1em;
+        cursor: pointer;
+        transition: background 0.2s;
+      }
+
+      button[type="submit"]:hover {
+        background: var(--accent-hover);
+      }
+
+      #stop-btn {
+        background: var(--danger);
+        color: white;
+        border: none;
+        padding: 12px 20px;
+        border-radius: var(--border-radius);
+        font-size: 1rem;
+        cursor: pointer;
+        box-shadow: var(--shadow);
+        transition: background 0.2s;
+      }
+
+      #stop-btn:hover {
+        background: var(--danger-hover);
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Discord Soundboard</h1>
+
+    <div id="sounds">Loading sounds…</div>
+
+    <form id="upload-form" enctype="multipart/form-data">
+      <h2>Upload New Sound</h2>
+      <label>
+        Sound Name:
+        <input type="text" name="name" required />
+      </label>
+      <label>
+        Emoji (optional):
+        <input
+          type="text"
+          name="emoji"
+          placeholder="e.g. 🔔 or 🎵"
+          maxlength="2"
+        />
+      </label>
+      <label>
+        MP3 File:
+        <input type="file" name="sound" accept=".mp3,audio/*" required />
+      </label>
+      <button type="submit">Upload</button>
+    </form>
+
+    <button id="stop-btn">Stop Playback</button>
+
+    <script>
+      const soundsDiv = document.getElementById("sounds");
+      const stopBtn = document.getElementById("stop-btn");
+      const uploadForm = document.getElementById("upload-form");
+
+      const ws = new WebSocket(`ws://${location.host}`);
+      let sounds = {};
+
+      ws.addEventListener("message", (event) => {
+        const msg = JSON.parse(event.data);
+        if (msg.type === "sounds") {
+          sounds = msg.sounds;
+          renderSounds();
+        }
+      });
+
+      function renderSounds() {
+        if (!sounds || Object.keys(sounds).length === 0) {
+          soundsDiv.textContent = "No sounds available.";
+          return;
+        }
+        soundsDiv.innerHTML = "";
+        for (const [name, { filename, emoji }] of Object.entries(sounds)) {
+          const btn = document.createElement("button");
+          btn.className = "sound-btn";
+          btn.textContent = `${emoji ? emoji + " " : ""}${name}`;
+          btn.onclick = () => playSound(name);
+          soundsDiv.appendChild(btn);
+        }
+      }
+
+      async function playSound(name) {
+        const playPressedAt = Date.now();
+        try {
+          await fetch("/play", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ sound: name, playPressedAt }),
+          });
+        } catch (e) {
+          alert("Failed to play sound");
+        }
+      }
+
+      stopBtn.onclick = async () => {
+        try {
+          await fetch("/stop", { method: "POST" });
+        } catch (e) {
+          alert("Failed to stop playback");
+        }
+      };
+
+      uploadForm.onsubmit = async (e) => {
+        e.preventDefault();
+        const formData = new FormData(uploadForm);
+        try {
+          const resp = await fetch("/upload", {
+            method: "POST",
+            body: formData,
+          });
+          if (resp.redirected) {
+            window.location.reload();
+          }
+        } catch (e) {
+          alert("Upload failed");
+        }
+      };
+    </script>
+  </body>
+</html>
